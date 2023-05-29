@@ -1,2 +1,3 @@
-# rohankurup.github.io
-My personal site for testing and learning some web dev skills. :)
+# CSE134B-SS20-HW1
+# Name:
+# PID:
