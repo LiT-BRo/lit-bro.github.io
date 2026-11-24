@@ -167,7 +167,7 @@
   <div id="sBox">
     <div id="sDate"></div>
     <div id="sClock"></div>
-    <div id="sStatus"><i id="sPulse" class="pulse offline"></i><span id="sStatusTxt">Tap to wake</span></div>
+    <div id="sStatus"><i id="sPulse" class="pulse offline"></i></div>
   </div>
 </section>
 
@@ -182,15 +182,15 @@
     <div id="clock"></div>
     <div id="widgets">
       <div class="w wRect">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M5 21V4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v17M3 21h18"/><circle cx="15" cy="12" r="1.1" fill="currentColor"/></svg>
-        <div><b id="wState">OFF</b><span id="wSub">Not listening</span></div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><rect x="3" y="4.5" width="18" height="16" rx="3"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg>
+        <div><b id="wTop">—</b><span id="wBot">No events today</span></div>
       </div>
       <div class="w wCirc">
         <svg class="ring" viewBox="0 0 52 52"><circle class="track" cx="26" cy="26" r="22"/><circle id="gauge" class="prog" cx="26" cy="26" r="22"/></svg>
         <b id="wQuiet">–</b>
       </div>
       <div class="w wCirc" id="wMic">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 20.5l-1.3-1.15C6.1 15.2 3.2 12.6 3.2 9.4 3.2 6.8 5.25 4.8 7.85 4.8c1.47 0 2.88.68 3.8 1.76.92-1.08 2.33-1.76 3.8-1.76 2.6 0 4.65 2 4.65 4.6 0 3.2-2.9 5.8-7.5 9.95L12 20.5z"/></svg>
       </div>
     </div>
     <div class="spacer"></div>
@@ -697,9 +697,8 @@ function scoreIntent(leaveText, contextText, custom){
   }
   const C = 2 * Math.PI * 22;
   function renderWidgets(){
-    const now = Date.now(), quiet = now - lastActivity;
-    $('wState').textContent = paused ? 'PAUSED' : LABEL[state];
-    $('wSub').textContent = !running ? 'Not listening' : needsTap ? 'Mic stopped' : 'Voice ' + ago(quiet) + ' ago';
+    const now = Date.now(), quiet = now - lastActivity, d = new Date();
+    $('wTop').textContent = d.toLocaleDateString(undefined, { weekday:'long' });
     const target = state === 'armed' ? S.quietMin : state === 'out' ? S.longMin : (S.silenceMin || S.longMin);
     const elapsed = state === 'out' ? now - outAt : quiet;
     const frac = running ? Math.min(1, elapsed / (target*MIN)) : 0;
@@ -707,7 +706,6 @@ function scoreIntent(leaveText, contextText, custom){
     $('wQuiet').textContent = running ? Math.floor(elapsed/MIN) + 'm' : '–';
     const live = running && !paused && !needsTap;
     $('wMic').classList.toggle('live', live && micOn);
-    $('sStatusTxt').textContent = micLabel();
     $('sPulse').className = 'pulse' + (live ? '' : ' offline');
   }
   function renderNotif(animate){
