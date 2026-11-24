@@ -368,12 +368,12 @@ function parseList(str){ return prep(String(str || '').split(/[,\n]+/)); }
 
 const LEX = {
   strong: prep([ // 3 pts: explicit "we're leaving now"
-    "lets go","let's go","let us go","chal bahar","bahar chal","bahar chalte","chalo bahar","bahar chalo","chalte hain","chalte hai","chalein","chale kya","chalen",
+    "lets go","let's go","let us go","chalo","chalo na","chal bahar","bahar chal","bahar chalte","chalo bahar","bahar chalo","chalte hain","chalte hai","chalein","chale kya","chalen",
     "nikalte hain","nikalte hai","nikal rahe","nikal raha","nikal rha","nikalta hu","nikalta hoon","nikalta hun","nikal lete",
     "ja raha hu","ja raha hoon","jaa raha hu","jaa raha hoon","ja rha hu","jaa rha hu","ja rahe hain","jaa rahe hain","ja rahe hai","jata hu","jaata hu","jata hoon","jaata hoon",
     "going out","heading out","i am leaving","i'm leaving","im leaving","we are leaving","we're leaving","leaving now","see you","see ya",
     "milte hain","milte hai","baad mein milte","phir milte","lock kar dena","lock kar de","darwaza band","door band","light band kar","chabi le","key le",
-    "लेट्स गो","चल बाहर","बाहर चल","बाहर चलते","चलो बाहर","बाहर चलो","चलते हैं","चलते है","चलें","चलें क्या",
+    "लेट्स गो","चलो","चलो ना","चल बाहर","बाहर चल","बाहर चलते","चलो बाहर","बाहर चलो","चलते हैं","चलते है","चलें","चलें क्या",
     "निकलते हैं","निकलते है","निकल रहे","निकल रहा","निकलता हूं","निकल लेते","जा रहा हूं","जा रहे हैं","जा रहे है","जाता हूं",
     "मिलते हैं","मिलते है","फिर मिलते","लॉक कर","दरवाजा बंद","लाइट बंद"
   ]),
