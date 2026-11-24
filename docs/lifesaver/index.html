@@ -867,8 +867,9 @@ function scoreIntent(leaveText, contextText, custom){
   }catch(e){}
 
   setInterval(uiTick, 1000); uiTick(); show('saver');
-  log(`Ready. Mode: ${standalone ? 'Home Screen app (full screen)' : 'Safari tab'}. Alerts → ${subscribeLink()}`);
-  if(!SR) log(standalone ? 'Speech recognition is missing in Home Screen mode. Open Life Saver in a Safari tab instead.' : 'No speech recognition in this browser. Use Safari on the iPhone.');
+  log(`Ready. Mode: ${standalone ? 'Home Screen app' : 'Safari tab'}. Alerts → ${subscribeLink()}`);
+  if(standalone){ $('micBanner').textContent = 'Open Life Saver in Safari, not from the Home Screen icon. iOS only lets the mic run in a Safari tab.'; $('micBanner').classList.add('show'); }
+  if(!SR) log(standalone ? 'The mic does not work from the Home Screen icon. Open Life Saver in a Safari tab instead.' : 'No speech recognition in this browser. Use Safari on the iPhone.');
   if(store.get('lifesaver.wasRunning', false)) log('Was listening before. Unlock to resume automatically.');
 })();
 </script>
