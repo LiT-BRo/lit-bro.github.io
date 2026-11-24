@@ -253,10 +253,13 @@
 
   <div class="card">
     <div class="cardTitle">Alerts go to your other devices</div>
-    <div class="sub" style="margin:0">This iPhone only listens and never shows the alerts. It sends them through ntfy to every phone, iPad or laptop subscribed to this link:</div>
-    <code id="topicTxt"></code>
-    <div class="row"><button id="copyBtn" class="btn">Copy link</button></div>
-    <div class="hint">Phone/iPad: install the free ntfy app → + → enter the topic name. Laptop: open the link → Subscribe → allow notifications.</div>
+    <div class="sub" style="margin:0">This iPhone only listens. Alerts go to every device subscribed to this topic. It's fixed and the same everywhere:</div>
+    <code id="topicTxt" style="font-size:22px;font-weight:700;text-align:center;letter-spacing:.02em"></code>
+    <ol class="steps">
+      <li><b>Phone (ntfy app):</b> tap <b>+</b> → type <b id="topicTxt2"></b> exactly, nothing before or after → leave “Use another server” <b>off</b> → Subscribe.</li>
+      <li><b>Laptop:</b> open <b id="webTxt"></b> → Subscribe → allow notifications.</li>
+    </ol>
+    <div class="row" style="margin-top:8px"><button id="copyBtn" class="btn">Copy topic name</button></div>
   </div>
 
   <div class="card">
@@ -294,10 +297,6 @@
       <summary>Settings</summary>
       <label>Long-break trigger words (comma separated; Hindi recognition writes them in Devanagari, so keep both scripts)</label>
       <textarea id="s_triggers" rows="3"></textarea>
-      <label>ntfy topic</label>
-      <input id="s_topic" autocomplete="off">
-      <label>ntfy server</label>
-      <input id="s_server">
       <label>Recognition language</label>
       <select id="s_lang">
         <option value="hi-IN">Hindi (India), best for Hinglish</option>
@@ -401,7 +400,9 @@ function scoreIntent(leaveText, contextText, custom){
 
   // ================= settings =================
   const DEFAULT_TRIGGERS = 'chal, time, sutti, sutta, jota, चल, टाइम, सुट्टी, सुट्टा, जोता';
-  const DEFAULTS = { topic:'', server:'https://ntfy.sh', lang:'hi-IN', quietMin:6, longMin:30, disarmMin:20, silenceMin:45,
+  // Fixed alerts channel: identical on every device, never randomised
+  const TOPIC = 'rk-lifesaver', SERVER = 'https://ntfy.sh';
+  const DEFAULTS = { lang:'hi-IN', quietMin:6, longMin:30, disarmMin:20, silenceMin:45,
     sleepStart:0, sleepEnd:8, window:1000, back:'1', key:'', model:'claude-haiku-5-5', aiEvery:5,
     triggers:DEFAULT_TRIGGERS, pin:'258046', autoLock:90, lockAlerts:'1', warm:'1' };
   const store = {
@@ -409,9 +410,9 @@ function scoreIntent(leaveText, contextText, custom){
     set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
   };
   const S = Object.assign({}, DEFAULTS, store.get('lifesaver.settings', {}));
-  if(!S.topic){ S.topic = 'lifesaver-' + Math.random().toString(36).slice(2,10); store.set('lifesaver.settings', S); }
+  S.topic = TOPIC; S.server = SERVER;   // overrides the random topic older versions saved on this device
   let CUSTOM = parseList(S.triggers);
-  const FIELDS = ['triggers','topic','server','lang','quietMin','longMin','disarmMin','silenceMin','sleepStart','sleepEnd','window','back','pin','autoLock','lockAlerts','warm','key','model','aiEvery'];
+  const FIELDS = ['triggers','lang','quietMin','longMin','disarmMin','silenceMin','sleepStart','sleepEnd','window','back','pin','autoLock','lockAlerts','warm','key','model','aiEvery'];
   const NUM = new Set(['quietMin','longMin','disarmMin','silenceMin','sleepStart','sleepEnd','window','aiEvery','autoLock']);
   FIELDS.forEach(f => { $('s_'+f).value = S[f]; });
 
@@ -437,19 +438,18 @@ function scoreIntent(leaveText, contextText, custom){
   }
 
   // ================= notifications → other devices (ntfy) =================
-  function subscribeLink(){ return S.server.replace(/\/+$/,'') + '/' + S.topic; }
-  function renderDevices(){ $('topicTxt').textContent = subscribeLink(); }
+  function subscribeLink(){ return SERVER + '/' + TOPIC; }
+  function renderDevices(){ $('topicTxt').textContent = TOPIC; $('topicTxt2').textContent = TOPIC; $('webTxt').textContent = 'ntfy.sh/' + TOPIC; }
   renderDevices();
 
   async function push(title, message, priority, tags){
     lastAlert = { title, message, t: Date.now() };
     store.set('lifesaver.lastAlert', lastAlert);
     renderNotif(true);
-    if(!S.topic){ log('No ntfy topic set'); return; }
     try{
       // JSON to the server root as text/plain: no CORS preflight, unicode-safe
-      const r = await fetch(S.server.replace(/\/+$/,''), { method:'POST',
-        body: JSON.stringify({ topic:S.topic, title, message, priority: priority || 4, tags: tags || [] }) });
+      const r = await fetch(SERVER, { method:'POST',
+        body: JSON.stringify({ topic:TOPIC, title, message, priority: priority || 4, tags: tags || [] }) });
       log(r.ok ? `Pushed: ${title}` : `Push failed (${r.status})`);
     }catch(e){ log('Push error: ' + e.message); }
   }
@@ -834,9 +834,8 @@ function scoreIntent(leaveText, contextText, custom){
   };
   $('testBtn').onclick = () => push('Life Saver test', 'Notifications are reaching this device.', 3, ['white_check_mark']);
   $('copyBtn').onclick = () => {
-    const link = subscribeLink();
-    if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(() => log('Link copied'), () => log('Copy failed, long-press the link to copy'));
-    else log('Long-press the link to copy it');
+    if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(TOPIC).then(() => log('Topic name copied: ' + TOPIC), () => log('Copy failed. The topic is: ' + TOPIC));
+    else log('The topic is: ' + TOPIC);
   };
   $('simBtn').onclick = () => { if(!running){ log('Start first, then simulate.'); return; } handleFinal($('simText').value); $('simText').value = ''; };
   $('simQuiet').onclick = () => { lastActivity -= S.quietMin*MIN; log(`Simulated ${S.quietMin} min of silence`); tick(); };
