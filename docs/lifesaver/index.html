@@ -309,9 +309,9 @@
       <textarea id="s_triggers" rows="3"></textarea>
       <label>Recognition language</label>
       <select id="s_lang">
-        <option value="en-IN">English (India) — catches English + romanized Hindi (recommended)</option>
+        <option value="hi-IN">Hindi (India) — Devanagari</option>
+        <option value="en-IN">English (India) — English + romanized Hindi</option>
         <option value="auto">Auto — alternate English/Hindi windows</option>
-        <option value="hi-IN">Hindi (India) — Devanagari only</option>
       </select>
       <div class="two">
         <div><label>Quiet after leave cue → "out" (min)</label><input id="s_quietMin" type="number" min="1"></div>
@@ -429,9 +429,9 @@ function scoreIntent(leaveText, contextText, custom){
   const DEFAULT_TRIGGERS = 'chal, time, sutti, sutta, jota, चल, टाइम, सुट्टी, सुट्टा, जोता';
   // Fixed alerts channel: identical on every device, never randomised
   const TOPIC = 'rk-lifesaver', SERVER = 'https://ntfy.sh';
-  const DEFAULTS = { lang:'en-IN', quietMin:6, longMin:30, disarmMin:20, silenceMin:45,
+  const DEFAULTS = { lang:'hi-IN', quietMin:6, longMin:30, disarmMin:20, silenceMin:45,
     sleepStart:0, sleepEnd:8, window:1000, back:'1', key:'', model:'claude-haiku-5-5', aiEvery:5,
-    triggers:DEFAULT_TRIGGERS, pin:'258046', autoLock:90, warm:'1', noteGapMin:10,
+    triggers:DEFAULT_TRIGGERS, pin:'258046', autoLock:90, warm:'0', noteGapMin:10,
     pingStartStop:'1', silencePingEvery:10, heartbeatMin:30 };
   const store = {
     get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
@@ -439,10 +439,11 @@ function scoreIntent(leaveText, contextText, custom){
   };
   const S = Object.assign({}, DEFAULTS, store.get('lifesaver.settings', {}));
   S.topic = TOPIC; S.server = SERVER;   // overrides the random topic older versions saved on this device
-  // one-time: move phones stuck on the old Hindi-only default to English (catches English + romanized Hindi)
-  if(!store.get('lifesaver.langMigrated', false)){
-    if(S.lang === 'hi-IN'){ S.lang = 'en-IN'; store.set('lifesaver.settings', S); }
-    store.set('lifesaver.langMigrated', true);
+  // one-time correction: Hindi transcribes better here, and a 2nd held-open mic stream fights iOS speech recognition
+  if(!store.get('lifesaver.mig2', false)){
+    S.lang = 'hi-IN'; S.warm = '0';
+    store.set('lifesaver.settings', S);
+    store.set('lifesaver.mig2', true);
   }
   let CUSTOM = parseList(S.triggers);
   const FIELDS = ['triggers','lang','quietMin','longMin','disarmMin','silenceMin','sleepStart','sleepEnd','window','back','pin','autoLock','warm','noteGapMin','pingStartStop','silencePingEvery','heartbeatMin','key','model','aiEvery'];
