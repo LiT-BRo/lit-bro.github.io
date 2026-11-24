@@ -309,9 +309,9 @@
       <textarea id="s_triggers" rows="3"></textarea>
       <label>Recognition language</label>
       <select id="s_lang">
-        <option value="auto">Auto — English + Hindi, alternating (best for Hinglish)</option>
-        <option value="hi-IN">Hindi (India) only</option>
-        <option value="en-IN">English (India) only</option>
+        <option value="en-IN">English (India) — catches English + romanized Hindi (recommended)</option>
+        <option value="auto">Auto — alternate English/Hindi windows</option>
+        <option value="hi-IN">Hindi (India) — Devanagari only</option>
       </select>
       <div class="two">
         <div><label>Quiet after leave cue → "out" (min)</label><input id="s_quietMin" type="number" min="1"></div>
@@ -325,6 +325,9 @@
         <div><label>Passcode (6 digits)</label><input id="s_pin" inputmode="numeric" maxlength="6" autocomplete="off"></div>
         <div><label>Auto-lock console after (sec, 0 = never)</label><input id="s_autoLock" type="number" min="0"></div>
         <div><label>New note after silence of (min)</label><input id="s_noteGapMin" type="number" min="1"></div>
+        <div><label>Mic started/stopped pings</label><select id="s_pingStartStop"><option value="1">On</option><option value="0">Off</option></select></div>
+        <div><label>"Quiet for N min" ping every (min, 0 = off)</label><input id="s_silencePingEvery" type="number" min="0"></div>
+        <div><label>"Still listening" heartbeat every (min, 0 = off)</label><input id="s_heartbeatMin" type="number" min="0"></div>
         <div><label>Keep mic warm (fewer pop-ups)</label><select id="s_warm"><option value="1">On</option><option value="0">Off</option></select></div>
       </div>
       <label>AI layer: Anthropic API key (optional; catches phrasings the word lists miss)</label>
@@ -426,9 +429,10 @@ function scoreIntent(leaveText, contextText, custom){
   const DEFAULT_TRIGGERS = 'chal, time, sutti, sutta, jota, चल, टाइम, सुट्टी, सुट्टा, जोता';
   // Fixed alerts channel: identical on every device, never randomised
   const TOPIC = 'rk-lifesaver', SERVER = 'https://ntfy.sh';
-  const DEFAULTS = { lang:'auto', quietMin:6, longMin:30, disarmMin:20, silenceMin:45,
+  const DEFAULTS = { lang:'en-IN', quietMin:6, longMin:30, disarmMin:20, silenceMin:45,
     sleepStart:0, sleepEnd:8, window:1000, back:'1', key:'', model:'claude-haiku-5-5', aiEvery:5,
-    triggers:DEFAULT_TRIGGERS, pin:'258046', autoLock:90, warm:'1', noteGapMin:10 };
+    triggers:DEFAULT_TRIGGERS, pin:'258046', autoLock:90, warm:'1', noteGapMin:10,
+    pingStartStop:'1', silencePingEvery:10, heartbeatMin:30 };
   const store = {
     get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
     set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
@@ -436,14 +440,15 @@ function scoreIntent(leaveText, contextText, custom){
   const S = Object.assign({}, DEFAULTS, store.get('lifesaver.settings', {}));
   S.topic = TOPIC; S.server = SERVER;   // overrides the random topic older versions saved on this device
   let CUSTOM = parseList(S.triggers);
-  const FIELDS = ['triggers','lang','quietMin','longMin','disarmMin','silenceMin','sleepStart','sleepEnd','window','back','pin','autoLock','warm','noteGapMin','key','model','aiEvery'];
-  const NUM = new Set(['quietMin','longMin','disarmMin','silenceMin','sleepStart','sleepEnd','window','aiEvery','autoLock','noteGapMin']);
+  const FIELDS = ['triggers','lang','quietMin','longMin','disarmMin','silenceMin','sleepStart','sleepEnd','window','back','pin','autoLock','warm','noteGapMin','pingStartStop','silencePingEvery','heartbeatMin','key','model','aiEvery'];
+  const NUM = new Set(['quietMin','longMin','disarmMin','silenceMin','sleepStart','sleepEnd','window','aiEvery','autoLock','noteGapMin','silencePingEvery','heartbeatMin']);
   FIELDS.forEach(f => { $('s_'+f).value = S[f]; });
 
   // ================= state =================
   let running=false, paused=false, rec=null, recActive=false, restartT=null, quickEnds=0, sessionStart=0, wakeLock=null, warm=null;
   let state='off';
   let lastActivity=Date.now(), lastStartAt=0, lastResultAt=0, deadSent=false, needsTap=false;
+  let micDown=false, lastSilencePing=0, lastHeartbeat=Date.now();
   let armedAt=0, armGuess='unknown', armCue='', armSource='';
   let outAt=0, outGuess='unknown', longSent=false, outCue='';
   let words=[], utterances=[], interimText='', lastFinal='';
@@ -588,7 +593,7 @@ function scoreIntent(leaveText, contextText, custom){
   // ================= speech handling =================
   function markActivity(text){
     const now = Date.now();
-    lastActivity = now; lastResultAt = now;
+    lastActivity = now; lastResultAt = now; lastSilencePing = 0;
     if(state === 'out' && text.trim().split(/\s+/).length >= 2) comeBack(text);
   }
   function evaluate(){
@@ -643,6 +648,7 @@ function scoreIntent(leaveText, contextText, custom){
       if(needsTap){ needsTap = false; $('micBanner').classList.remove('show'); }
       setMic(true);
       if(S.lang === 'auto') log('Mic window: ' + r.lang);
+      if(micDown){ micDown = false; if(S.pingStartStop === '1') push('Mic back on', 'Listening resumed.', 3, ['ear']); }
       if(S.warm === '1' && !warm) warmMic();   // mic is already granted at this point, so this doesn't add a prompt
     };
     r.onresult = ev => {
@@ -692,11 +698,12 @@ function scoreIntent(leaveText, contextText, custom){
 
   function startListening(){
     if(!SR){ log(standalone ? 'Speech recognition is not available in Home Screen mode on this iOS. Open Life Saver in Safari.' : 'No speech recognition here. Use Safari on the iPhone.'); return false; }
-    running = true; paused = false; needsTap = false; deadSent = false; quickEnds = 0;
-    lastActivity = Date.now(); lastStartAt = Date.now();
+    running = true; paused = false; needsTap = false; deadSent = false; micDown = false; quickEnds = 0;
+    lastActivity = Date.now(); lastStartAt = Date.now(); lastSilencePing = 0; lastHeartbeat = Date.now();
     store.set('lifesaver.wasRunning', true);
     setState('idle', 'Listening. Leave the phone in the room on charge.');
     keepAwake(); startRec(); log(`Started (${S.lang}). Alerts → ${subscribeLink()}`);
+    if(S.pingStartStop === '1') push('Life Saver started', 'Listening in the room.', 3, ['ear']);
     updateButtons(); return true;
   }
   function stopListening(){
@@ -704,6 +711,7 @@ function scoreIntent(leaveText, contextText, custom){
     try{ wakeLock && wakeLock.release(); }catch(e){}
     store.set('lifesaver.wasRunning', false);
     setMic(false, 'idle'); setState('off', 'Stopped.'); log('Stopped'); updateButtons();
+    if(S.pingStartStop === '1') push('Life Saver stopped', 'No longer listening.', 3, ['stop_sign']);
   }
   function updateButtons(){ $('startBtn').textContent = running ? 'Stop' : 'Start'; $('pauseBtn').textContent = paused ? 'Resume' : 'Pause'; }
 
@@ -761,8 +769,18 @@ function scoreIntent(leaveText, contextText, custom){
     const alive = Math.max(lastStartAt, lastResultAt);
     if(!needsTap && now - alive > 3*MIN){ log('Watchdog: restarting mic'); lastStartAt = now - 2*MIN; killRec(); startRec(); }
     if(!deadSent && (needsTap || now - alive > 6*MIN)){
-      deadSent = true;
+      deadSent = true; micDown = true;
       push('Life Saver stopped listening', 'The mic on the iPhone needs a tap.', 4, ['warning']);
+    }
+    // status pings to your other devices
+    const qmin = Math.floor(quiet / MIN);
+    if(S.silencePingEvery > 0 && qmin >= S.silencePingEvery && qmin % S.silencePingEvery === 0 && qmin !== lastSilencePing && !inSleepHours()){
+      lastSilencePing = qmin;
+      push('Quiet for ' + qmin + ' min', state === 'out' ? 'Room still empty.' : 'No voices for ' + qmin + ' min.', 2, ['mute']);
+    }
+    if(S.heartbeatMin > 0 && now - lastHeartbeat >= S.heartbeatMin*MIN){
+      lastHeartbeat = now;
+      if(!inSleepHours()) push('Still listening', LABEL[state] + ' · quiet ' + qmin + ' min', 2, ['white_check_mark']);
     }
   }
   setInterval(tick, 5000);
